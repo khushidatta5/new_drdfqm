@@ -266,6 +266,20 @@ async def get_drift_reports():
 # Include the router in the main app
 app.include_router(api_router)
 
+# Add middleware for handling large file uploads
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class MaxSizeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Allow up to 500MB for file uploads
+        if request.url.path.endswith('/upload'):
+            request.scope['body_max_size'] = 500 * 1024 * 1024
+        response = await call_next(request)
+        return response
+
+app.add_middleware(MaxSizeMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
