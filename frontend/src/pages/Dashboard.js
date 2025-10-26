@@ -39,19 +39,42 @@ const Dashboard = () => {
       return;
     }
 
+    // Check file size on frontend (500MB limit)
+    const MAX_SIZE = 500 * 1024 * 1024; // 500MB
+    if (file.size > MAX_SIZE) {
+      toast.error(`File too large. Maximum size is ${MAX_SIZE / (1024 * 1024)}MB`);
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       setUploading(true);
       const response = await axios.post(`${API}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000, // 5 minutes timeout for large files
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload Progress: ${percentCompleted}%`);
+        }
       });
       toast.success(`Dataset "${response.data.filename}" uploaded successfully`);
       fetchDatasets();
     } catch (error) {
       console.error('Error uploading file:', error);
-      toast.error('Failed to upload dataset');
+      if (error.response) {
+        // Server responded with an error
+        toast.error(error.response.data.detail || 'Failed to upload dataset');
+      } else if (error.request) {
+        // Request made but no response
+        toast.error('No response from server. Please check your connection.');
+      } else {
+        // Something else happened
+        toast.error('Failed to upload dataset');
+      }
     } finally {
       setUploading(false);
     }
