@@ -34,8 +34,12 @@ const Dashboard = () => {
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file');
+    // Check file type - accept CSV, Excel, and JSON files
+    const supportedExtensions = ['.csv', '.xlsx', '.xls', '.json'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    if (!supportedExtensions.includes(fileExtension)) {
+      toast.error('Please upload a CSV, Excel (.xlsx, .xls), or JSON file');
       return;
     }
 
