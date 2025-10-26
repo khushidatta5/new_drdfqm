@@ -185,7 +185,7 @@ const Dashboard = () => {
       }}>
         <CardHeader>
           <CardTitle>Upload Dataset</CardTitle>
-          <CardDescription>Upload a CSV file to analyze data quality and drift</CardDescription>
+          <CardDescription>Upload CSV, Excel, or JSON files to analyze data quality and drift</CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -206,13 +206,13 @@ const Dashboard = () => {
           >
             <Upload size={48} color="#0ea5e9" style={{ margin: '0 auto 1rem' }} />
             <p style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', marginBottom: '0.5rem' }}>
-              {uploading ? 'Uploading...' : 'Drop your CSV file here or click to browse'}
+              {uploading ? 'Uploading...' : 'Drop your file here or click to browse'}
             </p>
-            <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Supports CSV files only</p>
+            <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Supports CSV, Excel (.xlsx, .xls), and JSON files</p>
             <input
               id="fileInput"
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls,.json"
               onChange={(e) => handleFileUpload(e.target.files[0])}
               style={{ display: 'none' }}
               data-testid="file-input"
