@@ -83,17 +83,42 @@ async def root():
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a CSV file and store metadata in MongoDB"""
     try:
+        logger.info(f"Received file upload request: {file.filename}, content_type: {file.content_type}")
+        
+        # Validate file type
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+        
+        if not file.filename.lower().endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Only CSV files are supported")
+        
         # Read file content
+        logger.info(f"Reading file contents...")
         contents = await file.read()
         file_size = len(contents)
+        logger.info(f"File size: {file_size} bytes")
+        
+        # Validate file size (max 500MB)
+        MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB")
+        
+        if file_size == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
         
         # Process with pandas
-        df_pandas = pd.read_csv(io.BytesIO(contents))
+        logger.info("Processing CSV with pandas...")
+        try:
+            df_pandas = pd.read_csv(io.BytesIO(contents))
+        except Exception as csv_error:
+            logger.error(f"CSV parsing error: {str(csv_error)}")
+            raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(csv_error)}")
         
         # Get basic statistics
         rows = len(df_pandas)
         columns = len(df_pandas.columns)
         column_names = df_pandas.columns.tolist()
+        logger.info(f"CSV processed: {rows} rows, {columns} columns")
         
         # Get data summary
         summary_stats = spark_processor.get_basic_stats(df_pandas)
@@ -109,15 +134,19 @@ async def upload_dataset(file: UploadFile = File(...)):
         )
         
         # Store in MongoDB
+        logger.info("Storing dataset in MongoDB...")
         doc = dataset.model_dump()
         doc['upload_date'] = doc['upload_date'].isoformat()
         doc['csv_data'] = contents.decode('utf-8')  # Store raw CSV
         
         await db.datasets.insert_one(doc)
+        logger.info(f"Dataset {file.filename} successfully uploaded with id: {dataset.id}")
         
         return dataset
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error(f"Error uploading file: {str(e)}")
+        logger.error(f"Error uploading file: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @api_router.get("/datasets", response_model=List[Dataset])
