@@ -25,7 +25,9 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
+# Set max upload size to 500MB (adjust as needed)
 app = FastAPI()
+app.router.redirect_slashes = False
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
