@@ -6,6 +6,7 @@ import QualityAnalysis from '@/pages/QualityAnalysis';
 import DriftDetection from '@/pages/DriftDetection';
 import Reports from '@/pages/Reports';
 import Layout from '@/components/Layout';
+import { Toaster } from 'sonner';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
