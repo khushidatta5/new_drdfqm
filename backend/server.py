@@ -81,7 +81,7 @@ async def root():
 
 @api_router.post("/upload", response_model=Dataset)
 async def upload_dataset(file: UploadFile = File(...)):
-    """Upload a CSV file and store metadata in MongoDB"""
+    """Upload a data file (CSV, Excel, JSON) and store metadata in MongoDB"""
     try:
         logger.info(f"Received file upload request: {file.filename}, content_type: {file.content_type}")
         
@@ -89,8 +89,15 @@ async def upload_dataset(file: UploadFile = File(...)):
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
         
-        if not file.filename.lower().endswith('.csv'):
-            raise HTTPException(status_code=400, detail="Only CSV files are supported")
+        # Get file extension
+        file_ext = file.filename.lower().split('.')[-1]
+        supported_formats = ['csv', 'xlsx', 'xls', 'json']
+        
+        if file_ext not in supported_formats:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported file format. Supported formats: {', '.join(supported_formats)}"
+            )
         
         # Read file content
         logger.info(f"Reading file contents...")
@@ -106,19 +113,32 @@ async def upload_dataset(file: UploadFile = File(...)):
         if file_size == 0:
             raise HTTPException(status_code=400, detail="File is empty")
         
-        # Process with pandas
-        logger.info("Processing CSV with pandas...")
+        # Process file based on format
+        logger.info(f"Processing {file_ext.upper()} file with pandas...")
         try:
-            df_pandas = pd.read_csv(io.BytesIO(contents))
-        except Exception as csv_error:
-            logger.error(f"CSV parsing error: {str(csv_error)}")
-            raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(csv_error)}")
+            if file_ext == 'csv':
+                df_pandas = pd.read_csv(io.BytesIO(contents))
+                # Store as CSV string
+                data_string = contents.decode('utf-8')
+            elif file_ext in ['xlsx', 'xls']:
+                df_pandas = pd.read_excel(io.BytesIO(contents))
+                # Convert to CSV string for storage
+                data_string = df_pandas.to_csv(index=False)
+            elif file_ext == 'json':
+                df_pandas = pd.read_json(io.BytesIO(contents))
+                # Convert to CSV string for storage
+                data_string = df_pandas.to_csv(index=False)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unsupported format: {file_ext}")
+        except Exception as parse_error:
+            logger.error(f"File parsing error: {str(parse_error)}")
+            raise HTTPException(status_code=400, detail=f"Invalid {file_ext.upper()} format: {str(parse_error)}")
         
         # Get basic statistics
         rows = len(df_pandas)
         columns = len(df_pandas.columns)
         column_names = df_pandas.columns.tolist()
-        logger.info(f"CSV processed: {rows} rows, {columns} columns")
+        logger.info(f"File processed: {rows} rows, {columns} columns")
         
         # Get data summary
         summary_stats = spark_processor.get_basic_stats(df_pandas)
@@ -137,7 +157,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         logger.info("Storing dataset in MongoDB...")
         doc = dataset.model_dump()
         doc['upload_date'] = doc['upload_date'].isoformat()
-        doc['csv_data'] = contents.decode('utf-8')  # Store raw CSV
+        doc['csv_data'] = data_string  # Store as CSV string regardless of input format
         
         await db.datasets.insert_one(doc)
         logger.info(f"Dataset {file.filename} successfully uploaded with id: {dataset.id}")
